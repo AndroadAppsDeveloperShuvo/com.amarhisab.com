@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <title>Global Logout Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+
+  <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl border border-red-500 text-center">
+    <h1 class="text-2xl font-bold mb-4 text-red-500">Admin Control Panel</h1>
+    <p class="mb-6 text-gray-400">এই বাটনে ক্লিক করলে বর্তমানে লগইন থাকা সকল ইউজার লগআউট হয়ে যাবে।</p>
+    
+    <button id="logout-all-btn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold transition duration-300">
+      Everyone Logout
+    </button>
+    
+    <p id="msg" class="mt-4 hidden text-green-400 font-semibold"></p>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDkqjA1Io411uidSZBLbYJlYHWGVY36zc8",
+      authDomain: "shuvo-all-tools.firebaseapp.com",
+      databaseURL: "https://shuvo-all-tools-default-rtdb.firebaseio.com",
+      projectId: "shuvo-all-tools",
+      appId: "1:475600173705:android:0251b1d46457dc4e806458"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    document.getElementById("logout-all-btn").addEventListener("click", () => {
+      const logoutTime = Date.now(); // বর্তমান সময় সেভ করছি
+      set(ref(db, 'admin_settings/logout_signal'), logoutTime)
+        .then(() => {
+          const msg = document.getElementById("msg");
+          msg.textContent = "সবাইকে লগআউট করার সিগন্যাল পাঠানো হয়েছে!";
+          msg.classList.remove("hidden");
+        });
+    });
+  </script>
+</body>
+</html>
