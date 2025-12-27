@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -34,7 +33,8 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDkqjA1Io411uidSZBLbYJlYHWGVY36zc8",
@@ -47,8 +47,8 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getDatabase(app);
     
-    // লোকাল পারসিস্টেন্স সেট করা
     await setPersistence(auth, browserLocalPersistence);
 
     const loginBtn = document.getElementById("login-btn");
@@ -58,7 +58,23 @@
 
     const TARGET_URL = "https://androadappsdevelopershuvo.github.io/amarhisab.com/";
 
-    // লগইন বাটন ক্লিক হ্যান্ডলার
+    // গ্লোবাল লগআউট লিসেনার
+    function listenForGlobalLogout() {
+      const logoutRef = ref(db, 'admin_settings/logout_signal');
+      onValue(logoutRef, (snapshot) => {
+        const remoteLogoutTime = snapshot.val();
+        const localLoginTime = localStorage.getItem('login_timestamp');
+
+        if (remoteLogoutTime && localLoginTime && remoteLogoutTime > localLoginTime) {
+          signOut(auth).then(() => {
+            localStorage.clear();
+            alert("অ্যাডমিন সবাইকে লগআউট করে দিয়েছে!");
+            window.location.reload();
+          });
+        }
+      });
+    }
+
     loginBtn.addEventListener("click", async () => {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -74,6 +90,8 @@
 
       try {
         await signInWithEmailAndPassword(auth, email, password);
+        // সফলভাবে লগইন হলে সময় সেভ করে রাখা হচ্ছে
+        localStorage.setItem('login_timestamp', Date.now());
       } catch (err) {
         loginError.textContent = "আপনার দেওয়া তথ্য সঠিক নয়। আবার চেষ্টা করুন।";
         loginError.classList.remove("hidden");
@@ -82,12 +100,13 @@
       }
     });
 
-    // ইউজারের লগইন অবস্থা চেক করে সরাসরি রিডাইরেক্ট
     onAuthStateChanged(auth, (user) => {
       if (user) {
+        // লগইন থাকলে গ্লোবাল লগআউট চেক শুরু হবে
+        listenForGlobalLogout();
+        
         loginSection.classList.add("hidden");
         loadingSection.classList.remove("hidden");
-        // দ্রুত রিডাইরেক্ট নিশ্চিত করতে
         window.location.replace(TARGET_URL);
       }
     });
