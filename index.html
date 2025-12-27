@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -34,7 +35,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+    import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDkqjA1Io411uidSZBLbYJlYHWGVY36zc8",
@@ -58,21 +59,16 @@
 
     const TARGET_URL = "https://androadappsdevelopershuvo.github.io/amarhisab.com/";
 
-    // গ্লোবাল লগআউট লিসেনার
-    function listenForGlobalLogout() {
-      const logoutRef = ref(db, 'admin_settings/logout_signal');
-      onValue(logoutRef, (snapshot) => {
-        const remoteLogoutTime = snapshot.val();
-        const localLoginTime = localStorage.getItem('login_timestamp');
+    // গ্লোবাল লগআউট চেক করার উন্নত ফাংশন
+    async function isSessionValid() {
+      const snapshot = await get(ref(db, 'admin_settings/logout_signal'));
+      const remoteLogoutTime = snapshot.val();
+      const localLoginTime = localStorage.getItem('login_timestamp');
 
-        if (remoteLogoutTime && localLoginTime && remoteLogoutTime > localLoginTime) {
-          signOut(auth).then(() => {
-            localStorage.clear();
-            alert("অ্যাডমিন সবাইকে লগআউট করে দিয়েছে!");
-            window.location.reload();
-          });
-        }
-      });
+      if (remoteLogoutTime && localLoginTime && Number(remoteLogoutTime) > Number(localLoginTime)) {
+        return false; // সেশন ইনভ্যালিড
+      }
+      return true; // সেশন ওকে
     }
 
     loginBtn.addEventListener("click", async () => {
@@ -90,7 +86,7 @@
 
       try {
         await signInWithEmailAndPassword(auth, email, password);
-        // সফলভাবে লগইন হলে সময় সেভ করে রাখা হচ্ছে
+        // লগইন করার সময় বর্তমান সময় সেভ করা হচ্ছে
         localStorage.setItem('login_timestamp', Date.now());
       } catch (err) {
         loginError.textContent = "আপনার দেওয়া তথ্য সঠিক নয়। আবার চেষ্টা করুন।";
@@ -100,17 +96,38 @@
       }
     });
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // লগইন থাকলে গ্লোবাল লগআউট চেক শুরু হবে
-        listenForGlobalLogout();
+        // অটো-লগইন হওয়ার আগে চেক করো অ্যাডমিন সিগন্যাল দিয়েছে কি না
+        const valid = await isSessionValid();
         
-        loginSection.classList.add("hidden");
-        loadingSection.classList.remove("hidden");
-        window.location.replace(TARGET_URL);
+        if (!valid) {
+          // যদি অ্যাডমিন সবাইকে বের করে দিয়ে থাকে
+          await signOut(auth);
+          localStorage.clear();
+          loginSection.classList.remove("hidden");
+          loadingSection.classList.add("hidden");
+          alert("অ্যাডমিন সবাইকে লগআউট করে দিয়েছে। দয়া করে আবার লগইন করুন।");
+        } else {
+          // যদি সেশন ঠিক থাকে, তবেই রিডাইরেক্ট করো
+          loginSection.classList.add("hidden");
+          loadingSection.classList.remove("hidden");
+          window.location.replace(TARGET_URL);
+          
+          // লাইভ লিসেনার চালু রাখা (যাতে পেজ খোলা থাকা অবস্থায় বাটন টিপলে লগআউট হয়)
+          onValue(ref(db, 'admin_settings/logout_signal'), (snap) => {
+             const time = snap.val();
+             const local = localStorage.getItem('login_timestamp');
+             if(time && local && Number(time) > Number(local)) {
+                signOut(auth).then(() => {
+                  localStorage.clear();
+                  window.location.reload();
+                });
+             }
+          });
+        }
       }
     });
   </script>
-
 </body>
 </html>
